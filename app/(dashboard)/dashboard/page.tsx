@@ -2,6 +2,18 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
+type InvoiceItem = {
+  amount: number;
+};
+
+type Invoice = {
+  id: string;
+  status: string;
+  invoiceNumber: string;
+  client: { name: string };
+  items: InvoiceItem[];
+};
+
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id as string;
@@ -18,18 +30,19 @@ export default async function DashboardPage() {
     }),
   ]);
 
-  const totalEarned = invoices
-    .filter((inv) => inv.status === "paid")
-    .reduce((sum, inv) => {
+ 
+  const totalEarned = (invoices as Invoice[])
+    .filter((inv: Invoice) => inv.status === "paid")
+    .reduce((sum: number, inv: Invoice) => {
       const invoiceTotal = inv.items.reduce(
-        (s, item) => s + item.amount,
+        (s: number, item: InvoiceItem) => s + item.amount,
         0
       );
       return sum + invoiceTotal;
     }, 0);
 
-  const pending = invoices.filter(
-    (inv) => inv.status === "sent" || inv.status === "viewed"
+  const pending = (invoices as Invoice[]).filter(
+    (inv: Invoice) => inv.status === "sent" || inv.status === "viewed"
   ).length;
 
   return (
@@ -79,7 +92,7 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="divide-y">
-            {invoices.map((inv) => (
+            {(invoices as Invoice[]).map((inv: Invoice) => (
               <div
                 key={inv.id}
                 className="p-6 flex items-center justify-between"
