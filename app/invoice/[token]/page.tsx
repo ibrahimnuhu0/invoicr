@@ -1,34 +1,244 @@
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+"use client";
 
-export default async function PublicInvoicePage({
-  params,
-}: {
-  params: Promise<{ token: string }>; 
-}) {
-  const { token } = await params; 
+import { useEffect, useState, useRef } from "react";
+import { useParams } from "next/navigation";
+import { pdf, Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { publicToken: token },
-    include: { client: true, items: true, user: true },
-  });
+Font.register({
+  family: "NotoSans",
+  fonts: [
+    {
+      src: "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans@4.5.0/files/noto-sans-all-400-normal.woff",
+      fontWeight: 400,
+    },
+    {
+      src: "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans@4.5.0/files/noto-sans-all-700-normal.woff",
+      fontWeight: 700,
+    },
+  ],
+});
 
-  if (!invoice) notFound();
+type Invoice = {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  dueDate: string;
+  taxRate: number;
+  notes: string;
+  publicToken: string;
+  client: { name: string; email: string; address?: string };
+  user: { name: string; email: string; businessName?: string };
+  items: {
+    id: string;
+    description: string;
+    quantity: number;
+    rate: number;
+    amount: number;
+  }[];
+};
+
+const styles = StyleSheet.create({
+  page: { padding: 40, fontFamily: "NotoSans" },
+  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 30 },
+  title: { fontSize: 20, fontWeight: 700 },
+  label: { fontSize: 10, color: "#9ca3af", marginBottom: 4 },
+  value: { fontSize: 12 },
+  tableHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#111111",
+    paddingBottom: 8,
+    marginBottom: 4,
+  },
+  row: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e5e7eb",
+    paddingVertical: 8,
+  },
+  col1: { flex: 3, fontSize: 11 },
+  col2: { flex: 1, fontSize: 11, textAlign: "right" },
+  totals: { alignItems: "flex-end", marginTop: 16 },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: 180,
+    marginBottom: 6,
+  },
+  totalDivider: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: 180,
+    borderTopWidth: 1,
+    borderTopColor: "#111111",
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  totalLabel: { fontSize: 11, color: "#6b7280" },
+  totalValue: { fontSize: 11 },
+  totalLabelBold: { fontSize: 12, fontWeight: 700, color: "#111111" },
+  totalValueBold: { fontSize: 12, fontWeight: 700, color: "#111111" },
+});
+
+export default function PublicInvoicePage() {
+  const { token } = useParams();
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch(`/api/invoice/${token}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setInvoice(data);
+        setLoading(false);
+      });
+  }, [token]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-400">Loading invoice...</p>
+      </div>
+    );
+  }
+
+  if (!invoice || !invoice.id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-400">Invoice not found.</p>
+      </div>
+    );
+  }
 
   const subtotal = invoice.items.reduce((sum, item) => sum + item.amount, 0);
   const tax = (subtotal * invoice.taxRate) / 100;
   const total = subtotal + tax;
 
+  const handleDownloadPDF = async () => {
+    const doc = (
+      <Document>
+        <Page size="A4" style={styles.page}>
+
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>{invoice.user.businessName || invoice.user.name}</Text>
+              <Text style={{ fontSize: 11, color: "#6b7280" }}>{invoice.user.email}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.title}>{invoice.invoiceNumber}</Text>
+              <Text style={{ fontSize: 11, color: "#6b7280" }}>{invoice.status.toUpperCase()}</Text>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 30 }}>
+            <View>
+              <Text style={styles.label}>BILLED TO</Text>
+              <Text style={styles.value}>{invoice.client.name}</Text>
+              <Text style={{ fontSize: 11, color: "#6b7280" }}>{invoice.client.email}</Text>
+              {invoice.client.address && (
+                <Text style={{ fontSize: 11, color: "#6b7280" }}>{invoice.client.address}</Text>
+              )}
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.label}>DUE DATE</Text>
+              <Text style={styles.value}>
+                {new Date(invoice.dueDate).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.tableHeader}>
+            <Text style={[styles.col1, { color: "#9ca3af", fontSize: 10 }]}>DESCRIPTION</Text>
+            <Text style={[styles.col2, { color: "#9ca3af", fontSize: 10 }]}>QTY</Text>
+            <Text style={[styles.col2, { color: "#9ca3af", fontSize: 10 }]}>RATE</Text>
+            <Text style={[styles.col2, { color: "#9ca3af", fontSize: 10 }]}>AMOUNT</Text>
+          </View>
+
+          {invoice.items.map((item) => (
+            <View key={item.id} style={styles.row}>
+              <Text style={styles.col1}>{item.description}</Text>
+              <Text style={styles.col2}>{item.quantity}</Text>
+              <Text style={styles.col2}>₦{item.rate.toLocaleString()}</Text>
+              <Text style={styles.col2}>₦{item.amount.toLocaleString()}</Text>
+            </View>
+          ))}
+
+          <View style={styles.totals}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Subtotal</Text>
+              <Text style={styles.totalValue}>₦{subtotal.toLocaleString()}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Tax ({invoice.taxRate}%)</Text>
+              <Text style={styles.totalValue}>₦{tax.toLocaleString()}</Text>
+            </View>
+            <View style={styles.totalDivider}>
+              <Text style={styles.totalLabelBold}>Total</Text>
+              <Text style={styles.totalValueBold}>₦{total.toLocaleString()}</Text>
+            </View>
+          </View>
+
+          {invoice.notes && (
+            <View style={{ marginTop: 30, backgroundColor: "#f9fafb", padding: 12, borderRadius: 6 }}>
+              <Text style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Notes</Text>
+              <Text style={{ fontSize: 11, color: "#6b7280" }}>{invoice.notes}</Text>
+            </View>
+          )}
+
+        </Page>
+      </Document>
+    );
+
+    const blob = await pdf(doc).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${invoice.invoiceNumber}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePayment = async () => {
+    setPaying(true);
+
+    const res = await fetch("/api/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: invoice.client.email,
+        amount: total,
+        invoiceId: invoice.id,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.authorizationUrl) {
+      window.location.href = data.authorizationUrl;
+    } else {
+      alert("Payment initialization failed. Please try again.");
+      setPaying(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-md p-8">
-        
+      <div
+        ref={invoiceRef}
+        className="max-w-2xl mx-auto bg-white rounded-2xl shadow-md p-8"
+      >
         <div className="flex items-start justify-between mb-10">
           <div>
             <h1 className="text-2xl font-bold">
               {invoice.user.businessName || invoice.user.name}
             </h1>
-            <p className="text-gray-500 text-sm">{invoice.user.email}</p>
+            <p className="text-gray.500 text-sm">{invoice.user.email}</p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-gray-800">
@@ -115,13 +325,26 @@ export default async function PublicInvoicePage({
             <p>{invoice.notes}</p>
           </div>
         )}
+      </div>
+
+      <div className="max-w-2xl mx-auto mt-4 flex flex-col gap-3">
+        <button
+          onClick={handleDownloadPDF}
+          className="w-full border border-black text-black px-8 py-3 rounded-lg font-medium hover:bg-gray-50"
+        >
+          Download PDF
+        </button>
 
         {invoice.status !== "paid" && (
-          <div className="mt-8 text-center">
-            <button className="bg-black text-white px-8 py-3 rounded-lg font-medium hover:bg-gray-800 w-full">
-              Pay Now — ₦{total.toLocaleString()}
-            </button>
-          </div>
+          <button
+            onClick={handlePayment}
+            disabled={paying}
+            className="w-full bg-black text-white px-8 py-3 rounded-lg font-medium hover:bg-gray-800"
+          >
+            {paying
+              ? "Redirecting to payment..."
+              : `Pay Now — ₦${total.toLocaleString()}`}
+          </button>
         )}
       </div>
     </div>
