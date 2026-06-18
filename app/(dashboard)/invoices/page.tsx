@@ -2,6 +2,21 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
+type InvoiceItem = {
+  amount: number;
+};
+
+type Invoice = {
+  id: string;
+  status: string;
+  invoiceNumber: string;
+  dueDate: Date;
+  taxRate: number;
+  publicToken: string;
+  client: { name: string };
+  items: InvoiceItem[];
+};
+
 export default async function InvoicesPage() {
   const session = await auth();
   const userId = session?.user?.id as string;
@@ -12,9 +27,9 @@ export default async function InvoicesPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const getTotal = (invoice: any) => {
+  const getTotal = (invoice: Invoice) => {
     const subtotal = invoice.items.reduce(
-      (sum: number, item: any) => sum + item.amount,
+      (sum: number, item: InvoiceItem) => sum + item.amount,
       0
     );
     const tax = (subtotal * invoice.taxRate) / 100;
@@ -46,7 +61,7 @@ export default async function InvoicesPage() {
           </div>
         ) : (
           <div className="divide-y">
-            {invoices.map((invoice) => (
+            {(invoices as Invoice[]).map((invoice: Invoice) => (
               <div
                 key={invoice.id}
                 className="p-6 flex items-center justify-between"
