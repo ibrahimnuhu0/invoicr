@@ -39,58 +39,58 @@ export default async function InvoicesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold">Invoices</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-[#0B0D10]">Invoices</h2>
         <Link
           href="/invoices/new"
-          className="bg-black text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800"
+          className="bg-[#0B0D10] text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-[#FF5A1F] transition-colors"
         >
-          + New Invoice
+          + New invoice
         </Link>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-6 border-b">
-          <h3 className="font-semibold">All Invoices</h3>
+      <div className="bg-white rounded-2xl border border-black/10">
+        <div className="p-6 border-b border-black/10">
+          <h3 className="font-bold text-[#0B0D10]">All invoices</h3>
         </div>
         {invoices.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">
+          <div className="p-6 text-center text-[#6B7280]">
             No invoices yet.{" "}
-            <Link href="/invoices/new" className="text-black underline">
+            <Link href="/invoices/new" className="text-[#0B0D10] font-bold underline">
               Create your first one
             </Link>
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-black/10">
             {(invoices as Invoice[]).map((invoice: Invoice) => (
               <div
                 key={invoice.id}
                 className="p-6 flex items-center justify-between"
               >
                 <div>
-                  <p className="font-medium">{invoice.client.name}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="font-medium text-[#0B0D10]">{invoice.client.name}</p>
+                  <p className="text-sm text-[#6B7280]">
                     {invoice.invoiceNumber} · Due{" "}
                     {new Date(invoice.dueDate).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="font-medium">
+                  <p className="font-medium tabular-nums text-[#0B0D10]">
                     ₦{getTotal(invoice).toLocaleString()}
                   </p>
                   <span
-                    className={`text-xs px-3 py-1 rounded-full font-medium ${
+                    className={`text-xs px-3 py-1 rounded-full font-bold ${
                       invoice.status === "paid"
-                        ? "bg-green-100 text-green-700"
+                        ? "bg-[#0B0D10] text-white"
                         : invoice.status === "overdue"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-yellow-100 text-yellow-700"
+                        ? "bg-[#FF5A1F]/10 text-[#FF5A1F]"
+                        : "bg-[#FFD23F]/30 text-[#0B0D10]"
                     }`}
                   >
                     {invoice.status}
                   </span>
                   <Link
                     href={`/invoice/${invoice.publicToken}`}
-                    className="text-sm text-gray-500 hover:text-black underline"
+                    className="text-sm text-[#6B7280] hover:text-[#0B0D10] underline transition-colors"
                   >
                     View
                   </Link>
