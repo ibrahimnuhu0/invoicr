@@ -1,5 +1,8 @@
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import { authConfig } from "@/auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
@@ -8,8 +11,9 @@ export default auth((req) => {
     req.nextUrl.pathname.startsWith("/register");
   const isPublicInvoice =
     req.nextUrl.pathname.startsWith("/invoice");
+  const isLandingPage = req.nextUrl.pathname === "/";
 
-  if (isPublicInvoice) {
+  if (isPublicInvoice || isLandingPage) {
     return NextResponse.next();
   }
 
