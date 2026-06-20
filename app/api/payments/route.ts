@@ -12,6 +12,17 @@ export async function POST(req: Request) {
       );
     }
 
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+    });
+
+    if (!invoice) {
+      return NextResponse.json(
+        { error: "Invoice not found" },
+        { status: 404 }
+      );
+    }
+
     const response = await fetch(
       "https://api.paystack.co/transaction/initialize",
       {
@@ -23,6 +34,7 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           email,
           amount: Math.round(amount * 100),
+          callback_url: `${process.env.NEXTAUTH_URL}/invoice/${invoice.publicToken}`,
           metadata: {
             invoiceId,
           },
